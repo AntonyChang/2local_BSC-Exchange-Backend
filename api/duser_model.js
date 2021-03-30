@@ -7,6 +7,7 @@ var http = require('http');
 // var io = require(‘socket.io’)(http);
 const server = http.createServer(app);
 var io = require('socket.io')(server);
+var weburl = "http://localhost:3000/";
 
 
 let transport = nodemailer.createTransport({
@@ -38,7 +39,7 @@ router.post('/addUser', (req, res) => {
 			res.send({ message:error});
         } else {
 			var name = req.body.email;
-			var link1 = "test";
+			var link1 = weburl+"session/signup-verification?verificationCode="+str;
 			getWelcomeEmail(name,link1);
             res.send({ data: result,message:'Registered Successfully! The wallet id has been sent your email address' });
         }
@@ -93,7 +94,7 @@ router.get('/getProfile/:id', (req, res) => {
 
 router.post('/verifyEmail/:id', (req, res) => {
 	
-    var sql = "select mst_userid from mst_users where verification_code='"+req.params.id+"'";
+    var sql = "select mst_userid from mst_users where user_status = 0 and verification_code='"+req.params.id+"'";
 	console.log(sql);
     db.query(sql, (error, result) => {
         if (error) {
@@ -101,11 +102,11 @@ router.post('/verifyEmail/:id', (req, res) => {
         } else {
 			if(result.length > 0)
 			{
-				var str = makeid(16);
+				
 				 var user_profile = {
 					user_status	: 1
 				}
-				var sql1 = `update mst_users SET ? where verification_code=${req.params.id}`;
+				var sql1 = "update mst_users SET ? where verification_code='"+req.params.id+"'";
 				executeQuery(sql1,user_profile);
 				
 				res.send({ status: true,message:"Your account verified successfully" });
@@ -149,6 +150,8 @@ router.post('/forgotPassword', (req, res) => {
 				}
 				var sql1 =`insert into forgot_password SET  ?`;
 				executeQuery(sql1,user_profile);
+				var link1 = weburl+"session/reset-password?id="+str;
+				getForgotEmail(req.body.email,link1);
 				res.send({ status: true,message:"Reset password link sent your email address" });
 			}else{
 				res.send({status:false,message:"Invalid Link"});
@@ -167,7 +170,11 @@ router.post('/fotgotLinkVerify/:id', (req, res) => {
             res.send({status:false,message:'Getting Error' + error})
         } else {
 			if(result.length > 0)
-			{				
+			{		
+				 var user_profile = {
+					status	: 1
+				}
+				
 				res.send({ status: true});
 			}else{
 				res.send({status:false,message:"Invalid Link"});
@@ -180,7 +187,6 @@ router.post('/fotgotLinkVerify/:id', (req, res) => {
 router.post('/resetPassword', (req, res) => {
     
     var sql = "select user_id from forgot_password where act_code='"+req.body.token+"' AND status = 0";
-	console.log(sql);
     db.query(sql, (error, result) => {
         if (error) {
             res.send({status:false,message:'Getting Error' + error})
@@ -191,8 +197,12 @@ router.post('/resetPassword', (req, res) => {
 					user_secret: req.body.newPassword
 				}
 				var sql1 = "update mst_users SET ? where mst_userid='"+result[0].user_id+"'";	
-				console.log(sql1);
 				executeQuery(sql1,user_profile);
+				var user_profile1 = {
+					status: 1
+				}
+				var sql1 =`update forgot_password SET  ? where user_id = `+result[0].user_id;
+				executeQuery(sql1,user_profile1);
 				res.send({ status: true,message:"Password has been updated successfully"});
 			}else{
 				res.send({status:false,message:"Invalid Link"});
@@ -356,9 +366,9 @@ router.get('/send_plain_mail', function(req, res) {
 	});
 	res.send('Getting Error');
 });
-function getWelcomeEmail(name,link1)
+function getForgotEmail(name,link1)
 {
-	var email = '<table id="bodyTable" border="0" width="100%" cellspacing="0" cellpadding="0" align="center" bgcolor="#f3f3f3"><tbody><tr><td id="bodyCell" align="center" valign="top"><table class="templateContainer" style="max-width: 700px; padding: 20px 10px;" border="0" width="100%" ellspacing="0" cellpadding="0"><tbody><tr><td id="templateHeader" style="padding: 0px 0 15px 0;" align="center" valign="top"><div style="padding: 0;"><img height="100" width="100" src="https://exchange-y9nd8.ondigitalocean.app/static/media/2local%20logo%20wht.67c3f541.svg" alt="2Local logo" /></div></td></tr><tr><td style="border-radius: 8px;" align="center" valign="top" bgcolor="#ffffff"><table class="moilecenre" border="0" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td class="mobilesp" style="padding: 40px 50px 0 50px;" valign="top"><div><h2 style="text-align: center; margin: 0px 0 20px 0; color: #303030; font-weight: 400; font-size: 28px; line-height: 32px;">Welcome to 2Local</h2><p style="margin: 10px 0 20px 0; color: #58585a; font-weight: 400; font-size: 16px; line-height: 22px;">Hi '+name+',<br /><br /> Welcome to 2Local. You need to take one more step to access your wallet. To activate your account, we need to verify if its actually your email address: <br /><br /><p style="margin: 10px 0px 0px; color: #58585a; font-weight: 400; font-size: 16px; line-height: 22px; text-align: center;"><span style="background: transparent linear-gradient(180deg,#53a8f0,#2d7fc4) 0 0 no-repeat padding-box; color: #fff!important; display: inline-block; font-family: inherit; font-weight: 500; border: 0; border-radius: 5px; white-space: nowrap; padding: 1rem 1.5rem; line-height: 1.4; text-align: center; -webkit-transition: .07s; transition: .07s; position: relative;"><span class="mc-toc-title"><a style="color: #ffffff; text-decoration: none;" href="'+link1+'">Verify Email</a></span></span></p></div></td></tr><tr><td class="mobiletem" style="padding: 10px 50px 40px 50px;" valign="top"><div><p style="color: #58585a; margin: 0; font-size: 17px; line-height: 22px;">Thanks,<br />2Local Team</p></div></td></tr></tbody></table></td></tr><tr><td id="templateFooter" valign="top"><table border="0" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td style="padding: 22px 10px 22px 10px;" align="center" valign="top"><p style="font-size: 15px; margin: 0 0 0px 0; color: #d42464; text-align: center; font-weight: 300;" align="center"><a style="color: #0EC167; font-weight: 300; text-decoration: none; padding: 0 5px 0 0;" target="_blank" href="https://exchange-y9nd8.ondigitalocean.app/">2Local</a></p></td></tr></tbody></table></td> </tr></tbody> </table></td></tr></tbody></table>';
+	var email = '<table id="bodyTable" border="0" width="100%" cellspacing="0" cellpadding="0" align="center" bgcolor="#f3f3f3"><tbody><tr><td id="bodyCell" align="center" valign="top"><table class="templateContainer" style="max-width: 700px; padding: 20px 10px;" border="0" width="100%" ellspacing="0" cellpadding="0"><tbody><tr><td id="templateHeader" style="padding: 0px 0 15px 0;" align="center" valign="top"><div style="padding: 0;"><img height="100" width="100" src="https://exchange-y9nd8.ondigitalocean.app/static/media/2local logo wht.67c3f541.svg" alt="2Local logo" /></div></td></tr><tr><td style="border-radius: 8px;" align="center" valign="top" bgcolor="#ffffff"><table class="moilecenre" border="0" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td class="mobilesp" style="padding: 40px 50px 0 50px;" valign="top"><div><h2 style="text-align: center; margin: 0px 0 20px 0; color: #303030; font-weight: 400; font-size: 28px; line-height: 32px;">Password Reset - 2Local</h2><p style="margin: 10px 0 20px 0; color: #58585a; font-weight: 400; font-size: 16px; line-height: 22px;">Hi '+name+',<br /><br />  Please click bellow button to reset your password. <br /><br /><p style="margin: 10px 0px 0px; color: #58585a; font-weight: 400; font-size: 16px; line-height: 22px; text-align: center;"><span style="background: transparent linear-gradient(180deg,#53a8f0,#2d7fc4) 0 0 no-repeat padding-box; color: #fff!important; display: inline-block; font-family: inherit; font-weight: 500; border: 0; border-radius: 5px; white-space: nowrap; padding: 1rem 1.5rem; line-height: 1.4; text-align: center; -webkit-transition: .07s; transition: .07s; position: relative;"><span class="mc-toc-title"><a style="color: #ffffff; text-decoration: none;" href="'+link1+'">Reset Password</a></span></span></p></div></td></tr><tr><td class="mobiletem" style="padding: 10px 50px 40px 50px;" valign="top"><div><p style="color: #58585a; margin: 0; font-size: 17px; line-height: 22px;">Thanks,<br />2Local Team</p></div></td></tr></tbody></table></td></tr><tr><td id="templateFooter" valign="top"><table border="0" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td style="padding: 22px 10px 22px 10px;" align="center" valign="top"><p style="font-size: 15px; margin: 0 0 0px 0; color: #d42464; text-align: center; font-weight: 300;" align="center"><a style="color: #0EC167; font-weight: 300; text-decoration: none; padding: 0 5px 0 0;" target="_blank" href="https://exchange-y9nd8.ondigitalocean.app/">2Local</a></p></td></tr></tbody></table></td> </tr></tbody> </table></td></tr></tbody></table>';
 	const message = {
 	    from: 'support@vishwasworld.com', // Sender address
 	    to: name,         // recipients
@@ -367,9 +377,20 @@ function getWelcomeEmail(name,link1)
 	};
 	transport.sendMail(message, function(err, info) {
 	   
-	});
-	
-	
+	});	
+}
+function getWelcomeEmail(name,link1)
+{
+	var email = '<table id="bodyTable" border="0" width="100%" cellspacing="0" cellpadding="0" align="center" bgcolor="#f3f3f3"><tbody><tr><td id="bodyCell" align="center" valign="top"><table class="templateContainer" style="max-width: 700px; padding: 20px 10px;" border="0" width="100%" ellspacing="0" cellpadding="0"><tbody><tr><td id="templateHeader" style="padding: 0px 0 15px 0;" align="center" valign="top"><div style="padding: 0;"><img height="100" width="100" src="https://exchange-y9nd8.ondigitalocean.app/static/media/2local logo wht.67c3f541.svg" alt="2Local logo" /></div></td></tr><tr><td style="border-radius: 8px;" align="center" valign="top" bgcolor="#ffffff"><table class="moilecenre" border="0" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td class="mobilesp" style="padding: 40px 50px 0 50px;" valign="top"><div><h2 style="text-align: center; margin: 0px 0 20px 0; color: #303030; font-weight: 400; font-size: 28px; line-height: 32px;">Welcome to 2Local</h2><p style="margin: 10px 0 20px 0; color: #58585a; font-weight: 400; font-size: 16px; line-height: 22px;">Hi '+name+',<br /><br /> Welcome to 2Local. You need to take one more step to access your wallet. To activate your account, we need to verify if its actually your email address: <br /><br /><p style="margin: 10px 0px 0px; color: #58585a; font-weight: 400; font-size: 16px; line-height: 22px; text-align: center;"><span style="background: transparent linear-gradient(180deg,#53a8f0,#2d7fc4) 0 0 no-repeat padding-box; color: #fff!important; display: inline-block; font-family: inherit; font-weight: 500; border: 0; border-radius: 5px; white-space: nowrap; padding: 1rem 1.5rem; line-height: 1.4; text-align: center; -webkit-transition: .07s; transition: .07s; position: relative;"><span class="mc-toc-title"><a style="color: #ffffff; text-decoration: none;" href="'+link1+'">Verify Email</a></span></span></p></div></td></tr><tr><td class="mobiletem" style="padding: 10px 50px 40px 50px;" valign="top"><div><p style="color: #58585a; margin: 0; font-size: 17px; line-height: 22px;">Thanks,<br />2Local Team</p></div></td></tr></tbody></table></td></tr><tr><td id="templateFooter" valign="top"><table border="0" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td style="padding: 22px 10px 22px 10px;" align="center" valign="top"><p style="font-size: 15px; margin: 0 0 0px 0; color: #d42464; text-align: center; font-weight: 300;" align="center"><a style="color: #0EC167; font-weight: 300; text-decoration: none; padding: 0 5px 0 0;" target="_blank" href="https://exchange-y9nd8.ondigitalocean.app/">2Local</a></p></td></tr></tbody></table></td> </tr></tbody> </table></td></tr></tbody></table>';
+	const message = {
+	    from: 'support@vishwasworld.com', // Sender address
+	    to: name,         // recipients
+	    subject: 'Email Verification - 2Local', // Subject line
+	    html: email // Plain text body
+	};
+	transport.sendMail(message, function(err, info) {
+	   
+	});	
 }
 function Changed(pre, now) {
     if(pre.length!=now.length)
